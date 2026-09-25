@@ -1,0 +1,34 @@
+Phase 1 — Environment & Geometry (preprocessing)
+ Step 1: Warehouse & obstacle representation — warehouse.py: voxel grid, obstacle geometry, is_valid_position, connected-component region detection. (committed)
+ Step 2a: ROI representation — viewpoints.py: PlanarROI, ROICell with position + outward normal, build_roi_cells. (verified correct — normals face into aisle)
+[~] Step 2b: Candidate viewpoint generation — ROI-driven (normal-projected standoffs), just revised. (pending your run + commit)
+ Step 2c: Candidate thinning — already implemented (thin_candidates), just needs to run against the new ROI-driven candidates and be visually confirmed.
+
+Phase 2 — Visibility
+ Step 3: Visibility matrix a_mg — 3D raycasting per (viewpoint, ROI cell) pair, checking:
+Range (‖v_m − r_g‖ ≤ R_max)
+Horizontal + vertical FoV (camera facing direction vs. angle to cell)
+Line-of-sight (ray not blocked by any obstacle)
+Output: sparse or dense a_mg boolean matrix, sized P × G.
+
+Phase 3 — Viewpoint Assignment (RL, Phase 4a)
+ Step 4: Gym-style PPO assignment environment — implements the MDP from Slide 34: state (ẑ_g, mask μ, UAV position, distance vector d_u), action (pick unmasked viewpoint), reward (ΔC_t, distance penalty), terminal reward (C_K bonus / S⁻ penalty). Includes the region-eligibility mask (ζ(v_m) = ρ(u)) from Slide 37–38.
+ Step 5: Train PPO (MaskablePPO) on the toy scenario first, then the full test warehouse. Sanity-check against the by-hand trace we did earlier.
+
+Phase 4 — Motion Planning (RL, Phase 4b)
+ Step 6: Reference path generation — cheap A*/straight-line path per UAV to its assigned viewpoint (ignores other UAVs, obstacles only). Feeds MAPPO's local observation.
+ Step 7: MAPPO local collision-avoidance environment — per Slide 38: local observation (own pos/vel, next-k waypoints, nearby UAVs, nearest obstacle), continuous velocity action, reward (waypoint tracking − collision penalties − energy).
+ Step 8: Train MAPPO (CTDE) on the reference paths from Step 6.
+
+Phase 5 — Joint Feedback Loop (Phase 4c)
+ Step 9: Cost-feedback wiring — replace PPO's A*-estimated d_u[m] with MAPPO's real trajectory cost once available (Slide 41), including the bootstrap sequence and the two rollout buffers (Slide 42–47).
+ Step 10: Iterate PPO ↔ MAPPO retraining every N episodes until stable (Slide 36 step 4c).
+
+Phase 6 — Evaluation & Baseline
+ Step 11: Evaluation metrics module — implement the full metric list from Slide 26: C_K, S⁻/S⁺, C_1, blind-spot ratio B, L_tot, T_mission, E_tot, min inter-UAV distance, obstacle violations, computation time.
+ Step 12 (optional but recommended for your report): ILP + CBS baseline — the original exact-optimization pipeline (Slide 24), used as a benchmark on small instances to validate the RL solution isn't wildly suboptimal (Slide 31's stated purpose for keeping it).
+
+Phase 7 — Experiments & Writeup
+ Step 13: Run the restricted-region-vs-unrestricted comparison experiment (flagged as deferred on Slide 39).
+ Step 14: Scale testing (larger warehouse, more UAVs/ROIs) — checks the "RL avoids re-solving from scratch" claim from Slide 30/32 actually holds.
+ Step 15: Final report writeup — mapped back to the formulation slides.
